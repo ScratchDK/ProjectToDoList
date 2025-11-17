@@ -10,6 +10,7 @@ app_name = UsersConfig.name
 urlpatterns = [
     path("login/", TokenObtainPairView.as_view(), name="login"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # Нужно потом поправить
     path(
         "users/<str:email>/",
         views.CustomUserDetailAPIView.as_view(),
@@ -27,9 +28,10 @@ urlpatterns = [
         views.CustomUserDeleteAPIView.as_view(),
         name="users_delete",
     ),
-    path(
-        "api/connect-telegram/",
-        views.ConnectTelegramView.as_view(),
-        name="connect-telegram",
-    ),
+    # В данном случае не нужно так как пользователь создается при первом запросе через телеграм бота
+    # path(
+    #     "api/connect-telegram/",
+    #     views.ConnectTelegramView.as_view(),
+    #     name="connect-telegram",
+    # ),
 ]

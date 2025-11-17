@@ -10,24 +10,25 @@ class CustomUserSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "email",
-            "password",
-            "groups",
             "first_name",
             "last_name",
             "phone_number",
-            "avatar",
             "city",
-            "confirmation_token",
-            "is_active",
-            "is_staff",
+            "avatar",
+            "telegram_chat_id",
+            "telegram_username",
+            "telegram_notifications",
+            "role",
+            "manager",
             "date_joined",
+            "is_active",
         ]
         extra_kwargs = {
             "password": {
                 "write_only": True,
-                "required": True,
+                "required": False, # Обязательный пароль, в данном случае не нужен так как авторизация через телеграм
             },  # Пароль не будет отображаться в API
-            "confirmation_token": {"read_only": True},  # Токен только для чтения
+            "telegram_chat_id": {"read_only": True},  # Только для чтения
         }
 
 
@@ -62,10 +63,16 @@ class PrivateUserSerializer(serializers.ModelSerializer):
             "date_joined",
             "payments",
         ]
+        read_only_fields = [
+            "id",
+            "date_joined",
+            "telegram_chat_id"
+        ]
 
 
-class TelegramConnectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomUser
-        fields = ["telegram_chat_id"]
-        extra_kwargs = {"telegram_chat_id": {"required": True}}
+# В данном случае не нужно так как пользователь создается при первом запросе через телеграм бота
+# class TelegramConnectSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = CustomUser
+#         fields = ["telegram_chat_id"]
+#         extra_kwargs = {"telegram_chat_id": {"required": True}}

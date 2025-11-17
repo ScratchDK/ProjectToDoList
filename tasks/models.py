@@ -61,8 +61,14 @@ class Task(CustomPKModel):
     user = models.ForeignKey(
         "users.CustomUser",
         on_delete=models.CASCADE,
-        related_name="tasks",
+        related_name="owner_task",
         verbose_name="Пользователь",
+    )
+    executors = models.ManyToManyField(
+        "users.CustomUser",
+        related_name="assigned_tasks",
+        blank=True,
+        verbose_name="Исполнители"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

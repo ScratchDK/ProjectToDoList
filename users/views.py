@@ -7,14 +7,15 @@ from tasks.paginators import MyPagination
 from users.models import CustomUser
 from users.permissions import IsOwnerOrAdmin, IsProfileOwner
 from users.serializers import (CustomUserSerializer, PrivateUserSerializer,
-                               PublicUserSerializer, TelegramConnectSerializer)
+                               PublicUserSerializer)
+from django.contrib.auth import get_user_model
 
 
 # POST
 class CustomUserCreateAPIView(generics.CreateAPIView):
     serializer_class = CustomUserSerializer
     queryset = CustomUser.objects.all()
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny] # В данном случае доступ пока у всех так как бот Аноним
 
     def perform_create(self, serializer):
         password = serializer.validated_data.get("password")
@@ -49,9 +50,13 @@ class CustomUserListAPIView(generics.ListAPIView):
 # GET
 class CustomUserDetailAPIView(generics.RetrieveAPIView):
     serializer_class = CustomUserSerializer
-    queryset = CustomUser.objects.all()
+    #queryset = CustomUser.objects.all() - указываем с какой моделью работать,
     lookup_field = "email"
     permission_classes = [IsAuthenticated, IsProfileOwner]
+
+    def get_queryset(self):
+        # Только активные пользователи
+        return CustomUser.objects.filter(is_active=True)
 
     def get_serializer_class(self):
         if self.request.user == self.get_object():
@@ -64,17 +69,38 @@ class CustomUserDetailAPIView(generics.RetrieveAPIView):
         return [IsAuthenticated(), IsProfileOwner()]
 
 
-class ConnectTelegramView(APIView):
+# GET
+class ManagerExecutorsListView(generics.ListAPIView):
+    """Список исполнителей текущего менеджера"""
+    serializer_class = CustomUserSerializer
     permission_classes = [IsAuthenticated]
+    queryset = CustomUser.objects.all()
 
-    def patch(self, request):
-        serializer = TelegramConnectSerializer(
-            instance=request.user, data=request.data, partial=True
-        )
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"status": "Telegram chat ID успешно сохранен"},
-                status=status.HTTP_200_OK,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_queryset(self):
+        # Получаем текущего пользователя
+        user = self.request.user
+
+        # Проверяем что пользователь - менеджер
+        if user.role != 'manager':
+            return CustomUser.objects.none()  # ✅ Используй CustomUser
+
+        return CustomUser.objects.filter(manager=user, role='executor')
+
+
+# В данном случае не нужно так как пользователь создается при первом запросе через телеграм бота
+# class ConnectTelegramView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def patch(self, request):
+#         serializer = TelegramConnectSerializer(
+#             instance=request.user,   # Какой пользователь обновляется
+#             data=request.data,       # Данные от клиента (telegram_chat_id)
+#             partial=True             # Разрешить частичное обновление
+#         )
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(
+#                 {"status": "Telegram chat ID успешно сохранен"},
+#                 status=status.HTTP_200_OK,
+#             )
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -38,16 +39,17 @@ INSTALLED_APPS = [
     'django_celery_beat',
     "tasks",
     "users",
+    "django_extensions",
 ]
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+     "django.middleware.security.SecurityMiddleware",           # Безопасность
+    "django.contrib.sessions.middleware.SessionMiddleware",     # Сессии
+    "django.middleware.common.CommonMiddleware",                # Базовые функции
+    "django.middleware.csrf.CsrfViewMiddleware",                # Защита от CSRF
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # Аутентификация
+    "django.contrib.messages.middleware.MessageMiddleware",     # Сообщения
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",   # Защита от clickjacking
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -124,9 +126,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         # 'rest_framework.authentication.SessionAuthentication',
         # 'rest_framework.authentication.BasicAuthentication',
     ],
@@ -150,4 +153,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tasks.tasks.send_telegram_task_notifications",  # Путь к задаче
         "schedule": crontab(minute="*/5"),  # Каждый день в 07:00
     },
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),    # Время жизни Access токена (короткое)
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),   # Время жизни Refresh токена (длинное)
+    'ROTATE_REFRESH_TOKENS': True,                  # Можно ли обновлять Refresh токен
+    'BLACKLIST_AFTER_ROTATION': True,               # Отзывать старый Refresh токен при обновлении
 }

@@ -1,36 +1,44 @@
-import logging
 import os
-from typing import Dict, List, Optional
+from asgiref.sync import sync_to_async
+from typing import Dict, List
+from django.contrib.auth import get_user_model
 
 import httpx
-from django.conf import settings
+from rest_framework_simplejwt.tokens import AccessToken
 
-logger = logging.getLogger(__name__)
-
+User = get_user_model() # Получаем текущую модель user
 
 class DjangoAPIClient:
     def __init__(self):
-        self.base_url = os.getenv("DJANGO_API_URL", "http://localhost:8000")
-        logger.info(f"API Client using base URL: {self.base_url}")
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.base_url = os.getenv("DJANGO_API_URL", "http://localhost:8000") # Ищем в .env
+        self.client = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=10), timeout=30.0) # асинхронная версия HTTP клиента (как requests, но асинхронный)
+
+    @sync_to_async
+    def _get_user_and_token(self, telegram_chat_id: str):
+        """Синхронный метод для получения пользователя и токена"""
+        user = User.objects.get(telegram_chat_id=telegram_chat_id)
+        token = AccessToken.for_user(user)
+        return user, str(token)
 
     async def get_user_tasks(self, telegram_chat_id: str) -> List[Dict]:
         """Получить задачи пользователя по telegram_chat_id"""
         try:
-            logger.info(f"Requesting tasks for chat_id: {telegram_chat_id}")
+            user, token = await self._get_user_and_token(telegram_chat_id)
+
             url = f"{self.base_url}/tasks/"
-            params = {"telegram_chat_id": telegram_chat_id}
+            #params = {"telegram_chat_id": telegram_chat_id}   убираем, потому что нарушает принцип REST
+            headers = {'Authorization': f'Bearer {token}'} # Делаем запрос с токеном
 
-            logger.info(f"Making request to: {url} with params: {params}")
+            response = await self.client.get(url, headers=headers)
 
-            response = await self.client.get(url, params=params)
-            logger.info(f"Response status: {response.status_code}")
-            logger.info(f"Response headers: {response.headers}")
+            print(f"Что внутри response - {response}")
 
+            # Проверяет: Успешен ли HTTP запрос (статус 200-299) Если ошибка: Бросает исключение HTTPStatusError
             response.raise_for_status()
             data = response.json()
 
-            logger.info(f"Raw response data: {data}")
+            print(f"Data - {data}")
 
             # Обрабатываем пагинацию DRF
             if isinstance(data, dict) and "results" in data:
@@ -38,39 +46,51 @@ class DjangoAPIClient:
             else:
                 tasks = data
 
-            logger.info(f"Found {len(tasks)} tasks")
             return tasks
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP Error {e.response.status_code}: {e.response.text}")
             return []
         except Exception as e:
-            logger.error(f"API Error get_user_tasks: {e}")
             return []
 
     async def create_task(self, task_data: Dict, telegram_chat_id: str) -> Dict:
         """Создать новую задачу для пользователя по telegram_chat_id"""
         try:
-            task_data["telegram_chat_id"] = telegram_chat_id
-            logger.info(f"Creating task: {task_data}")
+            #task_data["telegram_chat_id"] = telegram_chat_id   не нужно! Будем привязывать по JWT
 
-            response = await self.client.post(
-                f"{self.base_url}/tasks/", json=task_data, timeout=30.0
-            )
-            logger.info(f"Response status: {response.status_code}")
+            user, token = await self._get_user_and_token(telegram_chat_id)
+            url = f"{self.base_url}/tasks/"
+
+            headers = {
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+
+            print(f"🔍 DEBUG: URL: {url}")
+            print(f"🔍 DEBUG: Headers: {headers}")
+            print(f"🔍 DEBUG: Task data: {task_data}")
+            print(f"🔍 DEBUG: Token: {token[:50]}...")  # Первые 50 символов токена
+
+            response = await self.client.post(url, json=task_data, headers=headers)
+
+            print(f"🔍 DEBUG: Response status: {response.status_code}")
+            print(f"🔍 DEBUG: Response text: {response.text}")  # ← Важно!
 
             response.raise_for_status()
             return response.json()
+
         except Exception as e:
-            logger.error(f"API Error create_task: {e}")
             raise e
 
-    async def get_categories(self) -> List[Dict]:
+    async def get_categories(self, telegram_chat_id: str) -> List[Dict]:
         """Получить список всех категорий"""
         try:
-            logger.info("Requesting categories")
-            response = await self.client.get(f"{self.base_url}/categories/")
-            logger.info(f"Categories response status: {response.status_code}")
+            user, token = await self._get_user_and_token(telegram_chat_id)
+
+            url = f"{self.base_url}/categories/"
+            headers = {'Authorization': f'Bearer {token}'}
+
+            response = await self.client.get(url, headers=headers)
 
             response.raise_for_status()
             data = response.json()
@@ -81,24 +101,55 @@ class DjangoAPIClient:
             else:
                 categories = data
 
-            logger.info(f"Found {len(categories)} categories")
+            print(f"Доступные категорий - {categories}")
             return categories
 
+        except httpx.HTTPStatusError as e:
+            return []
         except Exception as e:
-            logger.error(f"API Error get_categories: {e}")
             return []
 
-    async def create_category(self, category_data: Dict) -> Dict:
-        """Создать новую категорию"""
+
+    async def get_executors(self, telegram_chat_id: str):
+        print("Метод get_executors работает!")
+
         try:
-            logger.info(f"Creating category: {category_data}")
-            response = await self.client.post(
-                f"{self.base_url}/categories/", json=category_data, timeout=30.0
-            )
-            logger.info(f"Category creation response status: {response.status_code}")
+            user, token = await self._get_user_and_token(telegram_chat_id)
+
+            print(f"🔍 DEBUG: User role - {user.role}")
+            print(f"🔍 DEBUG: Telegram chat ID - {telegram_chat_id}")
+            print(f"🔍 DEBUG: User ID - {user.id}")
+
+            url = f"{self.base_url}/users/executors/"
+            headers = {'Authorization': f'Bearer {token}'}
+
+            response = await self.client.get(url, headers=headers)
+
+            print(f"🔍 DEBUG: Response status - {response.status_code}")
+            print(f"🔍 DEBUG: Response text - {response.text}")
 
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+
+            print(f"Data - {data}")
+
+            return data
+
         except Exception as e:
-            logger.error(f"API Error create_category: {e}")
             raise e
+
+
+
+
+    # На будущее, в данный момент создание через админку
+    # async def create_category(self, category_data: Dict) -> Dict:
+    #     """Создать новую категорию"""
+    #     try:
+    #         response = await self.client.post(
+    #             f"{self.base_url}/categories/", json=category_data, timeout=30.0
+    #         )
+    #
+    #         response.raise_for_status()
+    #         return response.json()
+    #     except Exception as e:
+    #         raise e

@@ -2,7 +2,7 @@ from aiogram import types
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 
-User = get_user_model()
+User = get_user_model() # Получаем текущую модель user
 
 
 @sync_to_async

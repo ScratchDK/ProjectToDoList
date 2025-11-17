@@ -8,7 +8,7 @@ async def list_categories(message: types.Message):
     api_client = DjangoAPIClient()
 
     # Получаем категории
-    categories = await api_client.get_categories()
+    categories = await api_client.get_categories(str(message.from_user.id))
 
     if not categories:
         await message.answer(

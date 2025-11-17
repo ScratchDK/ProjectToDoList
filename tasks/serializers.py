@@ -20,24 +20,28 @@ class TaskSerializer(serializers.ModelSerializer):
             "priority",
             "status",
             "categories",
-            "user",
+            "executors",
             "created_at",
             "updated_at",
             "is_overdue",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["created_at", "updated_at", "user"]
 
     def create(self, validated_data):
-        # Обрабатываем категории отдельно
+        # Извлекаем ManyToMany поля ДО создания объекта
         categories_data = validated_data.pop("categories", [])
+        executors_data = validated_data.pop("executors", [])
 
         print(f"Creating task with data: {validated_data}")  # для отладки
 
-        # Создаем задачу
+        # Создаем задачу БЕЗ ManyToMany полей
         task = Task.objects.create(**validated_data)
 
         # Добавляем категории если есть
         if categories_data:
             task.categories.set(categories_data)
+
+        if executors_data:
+            task.executors.set(executors_data)
 
         return task
